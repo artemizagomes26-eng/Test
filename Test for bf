@@ -1,0 +1,555 @@
+-- Services
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Anti-Cheat Bypass
+local function bypassAntiCheat()
+    local mt = getrawmetatable(game)
+    local old = mt.__namecall
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if method == "Kick" then
+            return nil
+        end
+        return old(self, ...)
+    end)
+    setreadonly(mt, true)
+end
+
+bypassAntiCheat()
+
+-- Create GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "BloxFruitsMenu"
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Main Frame (altura aumentada para caber mais botões)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.65, 0, 0.05, 0)
+MainFrame.Size = UDim2.new(0, 280, 0, 640) -- altura 640
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+-- UI Corner
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Parent = MainFrame
+Title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Title.BorderSizePixel = 0
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "Blox Fruits Menu V3"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 20
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = Title
+
+-- Close Button
+local CloseButton = Instance.new("TextButton")
+CloseButton.Parent = Title
+CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+CloseButton.BorderSizePixel = 0
+CloseButton.Position = UDim2.new(0.88, 0, 0.15, 0)
+CloseButton.Size = UDim2.new(0, 25, 0, 25)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 14
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 4)
+CloseCorner.Parent = CloseButton
+
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Create Button Function
+local function createButton(text, position, callback)
+    local Button = Instance.new("TextButton")
+    Button.Parent = MainFrame
+    Button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    Button.BorderSizePixel = 0
+    Button.Position = position
+    Button.Size = UDim2.new(0.9, 0, 0, 30)
+    Button.AnchorPoint = Vector2.new(0.5, 0)
+    Button.Font = Enum.Font.Gotham
+    Button.Text = text
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.TextSize = 13
+    
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 5)
+    ButtonCorner.Parent = Button
+    
+    -- Hover effect
+    Button.MouseEnter:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+        }):Play()
+    end)
+    
+    Button.MouseLeave:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        }):Play()
+    end)
+    
+    Button.MouseButton1Click:Connect(callback)
+    
+    return Button
+end
+
+-- Variáveis de estado
+local autoFarm = false
+local autoQuest = false
+local autoRaid = false
+local autoVulcao = false
+local autoSkills = false
+local fastAttack = false
+local autoMastery = false
+local autoMateriais = false
+local autoBoss = false
+local walkOnWater = false
+
+-- Função para atacar
+local function attackEnemy(aggressive)
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    -- Equipar melhor arma
+    local weapons = {}
+    for _, tool in pairs(character:GetChildren()) do
+        if tool:IsA("Tool") then
+            table.insert(weapons, tool)
+        end
+    end
+    
+    if #weapons > 0 then
+        humanoid:EquipTool(weapons[1])
+    end
+    
+    -- Ataque básico
+    VirtualInputManager:SendKeyEvent(true, "Z", false, game)
+    wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, "Z", false, game)
+    
+    -- Se agressivo ou autoSkills
+    if aggressive or autoSkills then
+        wait(0.08)
+        VirtualInputManager:SendKeyEvent(true, "X", false, game)
+        wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, "X", false, game)
+        wait(0.08)
+        VirtualInputManager:SendKeyEvent(true, "C", false, game)
+        wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, "C", false, game)
+        wait(0.08)
+        VirtualInputManager:SendKeyEvent(true, "V", false, game)
+        wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, "V", false, game)
+    end
+end
+
+-- Função para encontrar inimigo mais próximo
+local function findNearestEnemy(distance, filterBoss)
+    local character = LocalPlayer.Character
+    if not character then return nil end
+    
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return nil end
+    
+    local nearestEnemy = nil
+    local nearestDistance = distance or 100
+    
+    local enemiesFolder = workspace:FindFirstChild("Enemies")
+    if not enemiesFolder then return nil end
+    
+    for _, enemy in pairs(enemiesFolder:GetChildren()) do
+        if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+            local enemyRoot = enemy:FindFirstChild("HumanoidRootPart")
+            if enemyRoot then
+                local isBoss = enemy.Name:lower():find("boss") or enemy.Name:lower():find("raid") or enemy.Name:lower():find("elite")
+                if filterBoss == nil or (filterBoss == true and isBoss) or (filterBoss == false and not isBoss) then
+                    local dist = (enemyRoot.Position - humanoidRootPart.Position).Magnitude
+                    if dist < nearestDistance then
+                        nearestDistance = dist
+                        nearestEnemy = enemy
+                    end
+                end
+            end
+        end
+    end
+    
+    return nearestEnemy
+end
+
+-- Função para teleportar
+local function teleportTo(position)
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart then
+        humanoidRootPart.CFrame = CFrame.new(position)
+    end
+end
+
+-- Função para coletar materiais (drops)
+local function collectMaterials()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+    
+    local items = {}
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("Part") or obj:IsA("MeshPart") then
+            local name = obj.Name:lower()
+            if name:find("item") or name:find("drop") or name:find("chest") or name:find("material") or name:find("fruit") or name:find("gem") or name:find("coin") then
+                if obj:FindFirstChild("Position") then
+                    table.insert(items, obj)
+                end
+            end
+        end
+    end
+    
+    local nearestItem = nil
+    local nearestDist = 50
+    for _, item in pairs(items) do
+        local dist = (item.Position - humanoidRootPart.Position).Magnitude
+        if dist < nearestDist then
+            nearestDist = dist
+            nearestItem = item
+        end
+    end
+    
+    if nearestItem then
+        teleportTo(nearestItem.Position)
+        wait(0.5)
+    end
+end
+
+-- Botões reorganizados (passo menor)
+local yPos = 0.12
+local yStep = 0.065 -- passo menor para caber 13 botões
+
+-- AUTO RAID
+local RaidButton = createButton("Auto Raid: OFF", UDim2.new(0.5, 0, yPos, 0), function()
+    autoRaid = not autoRaid
+    RaidButton.Text = "Auto Raid: " .. (autoRaid and "ON" or "OFF")
+    RaidButton.BackgroundColor3 = autoRaid and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+end)
+yPos = yPos + yStep
+
+-- AUTO VULCÃO
+local VulcaoButton = createButton("Auto Vucão: OFF", UDim2.new(0.5, 0, yPos, 0), function()
+    autoVulcao = not autoVulcao
+    VulcaoButton.Text = "Auto Vucão: " .. (autoVulcao and "ON" or "OFF")
+    VulcaoButton.BackgroundColor3 = autoVulcao and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+end)
+yPos = yPos + yStep
+
+-- AUTO FARM
+local AutoFarmButton = createButton("Auto Farm: OFF", UDim2.new(0.5, 0, yPos, 0), function()
+    autoFarm = not autoFarm
+    AutoFarmButton.Text = "Auto Farm: " .. (autoFarm and "ON" or "OFF")
+    AutoFarmButton.BackgroundColor3 = autoFarm and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+end)
+yPos = yPos + yStep
+
+-- AUTO MAESTRIA
+local MasteryButton = createButton("Auto Maestria: OFF", UDim2.new(0.5, 0, yPos, 0), function()
+    autoMastery = not autoMastery
+    MasteryButton.Text = "Auto Maestria: " .. (autoMastery and "ON" or "OFF")
+    MasteryButton.BackgroundColor3 = autoMastery and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+end)
+yPos = yPos + yStep
+
+-- AUTO MATERIAIS
+local MateriaisButton = createButton("Auto Materiais: OFF", UDim2.new(0.5, 0, yPos, 0), function()
+    autoMateriais = not autoMateriais
+    MateriaisButton.Text = "Auto Materiais: " .. (autoMateriais and "ON" or "OFF")
+    MateriaisButton.BackgroundColor3 = autoMateriais and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+end)
+yPos = yPos + yStep
+
+-- AUTO BOSS
+local BossButton = createButton("Auto Boss: OFF", UDim2.new(0.5, 0, yPos, 0), function()
+    autoBoss = not autoBoss
+    BossButton.Text = "Auto Boss: " .. (autoBoss and "ON" or "OFF")
+    BossButton.BackgroundColor3 = autoBoss and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+end)
+yPos = yPos + yStep
+
+-- AUTO QUEST
+local AutoQuestButton = createButton("Auto Quest: OFF", UDim2.new(0.5, 0, yPos, 0), function()
+    autoQuest = not autoQuest
+    AutoQuestButton.Text = "Auto Quest: " .. (autoQuest and "ON" or "OFF")
+    AutoQuestButton.BackgroundColor3 = autoQuest and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+end)
+yPos = yPos + yStep
+
+-- AUTO SKILLS
+local SkillsButton = createButton("Auto Skills: OFF", UDim2.new(0.5, 0, yPos, 0), function()
+    autoSkills = not autoSkills
+    SkillsButton.Text = "Auto Skills: " .. (autoSkills and "ON" or "OFF")
+    SkillsButton.BackgroundColor3 = autoSkills and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+end)
+yPos = yPos + yStep
+
+-- FAST ATTACK
+local FastAttackButton = createButton("Fast Attack: OFF", UDim2.new(0.5, 0, yPos, 0), function()
+    fastAttack = not fastAttack
+    FastAttackButton.Text = "Fast Attack: " .. (fastAttack and "ON" or "OFF")
+    FastAttackButton.BackgroundColor3 = fastAttack and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+end)
+yPos = yPos + yStep
+
+-- TELEPORT RAID
+local TeleportRaidButton = createButton("Teleport Raid", UDim2.new(0.5, 0, yPos, 0), function()
+    local raidPositions = {
+        Vector3.new(5000, 100, 5000),
+        Vector3.new(-5000, 100, -5000),
+    }
+    local randomPos = raidPositions[math.random(1, #raidPositions)]
+    teleportTo(randomPos)
+    print("Teleportado para Raid!")
+end)
+yPos = yPos + yStep
+
+-- RESET CHARACTER
+local ResetButton = createButton("Reset Character", UDim2.new(0.5, 0, yPos, 0), function()
+    local character = LocalPlayer.Character
+    if character then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.Health = 0
+        end
+    end
+end)
+yPos = yPos + yStep
+
+-- SPEED HACK
+local SpeedButton = createButton("Speed Hack: Normal", UDim2.new(0.5, 0, yPos, 0), function()
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+    if humanoid then
+        if humanoid.WalkSpeed <= 16 then
+            humanoid.WalkSpeed = 100
+            SpeedButton.Text = "Speed Hack: Fast"
+            SpeedButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        else
+            humanoid.WalkSpeed = 16
+            SpeedButton.Text = "Speed Hack: Normal"
+            SpeedButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        end
+    end
+end)
+yPos = yPos + yStep
+
+-- WALK ON WATER (novo botão)
+local WalkWaterButton = createButton("Walk on Water: OFF", UDim2.new(0.5, 0, yPos, 0), function()
+    walkOnWater = not walkOnWater
+    WalkWaterButton.Text = "Walk on Water: " .. (walkOnWater and "ON" or "OFF")
+    WalkWaterButton.BackgroundColor3 = walkOnWater and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(60, 60, 60)
+end)
+
+-- WALK ON WATER LOOP
+spawn(function()
+    while true do
+        wait(0.1)
+        if walkOnWater then
+            local character = LocalPlayer.Character
+            if character then
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                local humanoid = character:FindFirstChild("Humanoid")
+                if humanoidRootPart and humanoid then
+                    local pos = humanoidRootPart.Position
+                    local waterHeight = workspace.Terrain:GetWaterHeight(Vector3.new(pos.X, 0, pos.Z))
+                    if waterHeight then
+                        -- Se o jogador está abaixo do nível da água, levanta-o
+                        if pos.Y < waterHeight + 2 then
+                            humanoidRootPart.CFrame = CFrame.new(Vector3.new(pos.X, waterHeight + 2.5, pos.Z))
+                            humanoidRootPart.Velocity = Vector3.new(0, 0, 0) -- zerar velocidade para não afundar
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- AUTO RAID LOOP
+spawn(function()
+    while true do
+        wait(1)
+        if autoRaid then
+            local character = LocalPlayer.Character
+            if character then
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if humanoidRootPart then
+                    local nearestEnemy = findNearestEnemy(150, true)
+                    if nearestEnemy then
+                        humanoidRootPart.CFrame = nearestEnemy.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+                        attackEnemy(autoSkills)
+                    else
+                        local normalEnemy = findNearestEnemy(100, false)
+                        if normalEnemy then
+                            humanoidRootPart.CFrame = normalEnemy.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+                            attackEnemy(autoSkills)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- AUTO VULCÃO LOOP
+spawn(function()
+    while true do
+        wait(1)
+        if autoVulcao then
+            local character = LocalPlayer.Character
+            if character then
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if humanoidRootPart then
+                    local vulcaoEnemies = {}
+                    local enemiesFolder = workspace:FindFirstChild("Enemies")
+                    if enemiesFolder then
+                        for _, enemy in pairs(enemiesFolder:GetChildren()) do
+                            if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                                if enemy.Name:lower():find("volcano") or enemy.Name:lower():find("magma") or enemy.Name:lower():find("fire") then
+                                    table.insert(vulcaoEnemies, enemy)
+                                end
+                            end
+                        end
+                    end
+                    
+                    if #vulcaoEnemies > 0 then
+                        local target = vulcaoEnemies[1]
+                        if target:FindFirstChild("HumanoidRootPart") then
+                            humanoidRootPart.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+                            attackEnemy(autoSkills)
+                        end
+                    else
+                        teleportTo(Vector3.new(-3000, 50, -3000))
+                        print("Teleportando para área do Vulcão...")
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- AUTO FARM NORMAL LOOP
+spawn(function()
+    while true do
+        wait(fastAttack and 0.3 or 1)
+        if autoFarm then
+            local character = LocalPlayer.Character
+            if character then
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if humanoidRootPart then
+                    local nearestEnemy = findNearestEnemy(100, false)
+                    if nearestEnemy then
+                        humanoidRootPart.CFrame = nearestEnemy.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+                        attackEnemy(autoSkills)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- AUTO MAESTRIA LOOP
+spawn(function()
+    while true do
+        wait(0.5)
+        if autoMastery then
+            local character = LocalPlayer.Character
+            if character then
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if humanoidRootPart then
+                    local nearestEnemy = findNearestEnemy(80, false)
+                    if nearestEnemy then
+                        humanoidRootPart.CFrame = nearestEnemy.HumanoidRootPart.CFrame * CFrame.new(0, 0, 2)
+                        attackEnemy(true)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- AUTO MATERIAIS LOOP
+spawn(function()
+    while true do
+        wait(2)
+        if autoMateriais then
+            collectMaterials()
+        end
+    end
+end)
+
+-- AUTO BOSS LOOP
+spawn(function()
+    while true do
+        wait(1)
+        if autoBoss then
+            local character = LocalPlayer.Character
+            if character then
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if humanoidRootPart then
+                    local boss = findNearestEnemy(200, true)
+                    if boss then
+                        humanoidRootPart.CFrame = boss.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+                        attackEnemy(autoSkills)
+                    else
+                        local bossAreas = {
+                            Vector3.new(0, 50, 0),
+                            Vector3.new(2000, 50, 2000),
+                            Vector3.new(-2000, 50, -2000),
+                            Vector3.new(3000, 50, -3000),
+                            Vector3.new(-3000, 50, 3000),
+                        }
+                        local randomArea = bossAreas[math.random(1, #bossAreas)]
+                        teleportTo(randomArea)
+                        print("Procurando boss em nova área...")
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- AUTO QUEST LOOP
+spawn(function()
+    while true do
+        wait(2)
+        if autoQuest then
+            local character = LocalPlayer.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                local npcFolder = workspace:FindFirstChild("NPCs") or workspace:FindFirstChild("Npcs")
+                if npcFolder then
+                    for _, npc in pairs(npcFolder:GetChildren()) do
+                        if npc:FindFirstChild("HumanoidRootPart") then
+                            local distance = (npc.HumanoidRootPart.Position - character.HumanoidRootPart.Position).Magnitude
